@@ -15,7 +15,7 @@ import (
 // https://maps.googleapis.com/maps/api/place/textsearch/json?key=AIzaSyC3MrrX8-db5JZW2_LwhwsjN1yXjdkj5YQ
 
 type (
-	queryPlaceResponse struct {
+	queryPlaceResp struct {
 		Results []struct {
 			PlaceID string `json:"place_id"`
 		} `json:"results"`
@@ -24,6 +24,16 @@ type (
 	placeAPI struct {
 		key  string
 		lang string
+	}
+
+	photo struct {
+		Ref string `json:"photo_reference"`
+	}
+
+	queryDetailsResp struct {
+		Result struct {
+			Photos []photo `json:"photos"`
+		} `json:"result"`
 	}
 )
 
@@ -52,7 +62,7 @@ func (a *placeAPI) doGet(reqURL string, query url.Values) ([]byte, error) {
 }
 
 func main() {
-	address := "Москва, Тверская, 14"
+	address := "Сколково"
 
 	api := &placeAPI{
 		key:  "AIzaSyC3MrrX8-db5JZW2_LwhwsjN1yXjdkj5YQ",
@@ -64,14 +74,32 @@ func main() {
 		log.Fatal().Err(err).Msg("Ошибка обращения в Google")
 	}
 
-	qr := &queryPlaceResponse{}
+	qrPl := &queryPlaceResp{}
 
-	err = json.Unmarshal(bb, qr)
+	err = json.Unmarshal(bb, qrPl)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Невозможно демаршализовать JSON из ответа Google")
 	}
 
-	pretty.Println(qr)
-
 	fmt.Fprintln(os.Stdout, string(bb))
+
+	bb, err = api.doGet("https://maps.googleapis.com/maps/api/place/details/json",
+		url.Values{
+			"place_id": []string{qrPl.Results[0].PlaceID},
+			"fields":   []string{"photo"},
+		},
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Ошибка обращения в Google")
+	}
+
+	qrDt := &queryDetailsResp{}
+	err = json.Unmarshal(bb, qrDt)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Невозможно демаршализовать JSON из ответа Google")
+	}
+
+	pretty.Println(qrDt)
+
+	// fmt.Fprintln(os.Stdout, string(bb))
 }
