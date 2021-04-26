@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"strconv"
-	"strings"
 
 	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
@@ -72,7 +72,7 @@ func (api *placeAPI) getPhotoUrl(photoRef string, maxwidth int) string {
 }
 
 func main() {
-	address := "Сколково"
+	address := "Земля Франца Иосифа"
 
 	api := &placeAPI{
 		key:  "AIzaSyC3MrrX8-db5JZW2_LwhwsjN1yXjdkj5YQ",
@@ -92,29 +92,49 @@ func main() {
 	}
 
 	fmt.Fprintln(os.Stdout, string(bb))
+	urls := []string{}
+	for _, r := range qrPl.Results {
+		uu, err := api.getPhotoURLs(r.PlaceID)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Невозможно получить фото по месту из Google")
+		}
+		urls = append(urls, uu...)
+	}
 
-	bb, err = api.doGet("https://maps.googleapis.com/maps/api/place/details/json",
+	if len(urls) == 0 {
+		log.Fatal().Err(err).Msg("Нет фото об этом месте")
+	}
+
+	comm := exec.Command("feh", urls...)
+	err = comm.Run()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Ошибка при запуске feh")
+	}
+}
+
+func (api *placeAPI) getPhotoURLs(placeID string) ([]string, error) {
+	bb, err := api.doGet("https://maps.googleapis.com/maps/api/place/details/json",
 		url.Values{
-			"place_id": []string{qrPl.Results[0].PlaceID},
+			"place_id": []string{placeID},
 			"fields":   []string{"photo"},
 		},
 	)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Ошибка обращения в Google")
+		return nil, err
 	}
 
 	qrDt := &queryDetailsResp{}
 	err = json.Unmarshal(bb, qrDt)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Невозможно демаршализовать JSON из ответа Google")
+		return nil, err
 	}
 
+	fmt.Fprintln(os.Stdout, string(bb))
 	pretty.Println(qrDt)
 
 	urls := make([]string, len(qrDt.Result.Photos))
 	for i := range qrDt.Result.Photos {
 		urls[i] = api.getPhotoUrl(qrDt.Result.Photos[i].Ref, 3200)
 	}
-
-	fmt.Fprintln(os.Stdout, strings.Join(urls, "\n"))
+	return urls, nil
 }
