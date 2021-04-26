@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
@@ -39,13 +41,13 @@ type (
 
 const placeTextSearch = "https://maps.googleapis.com/maps/api/place/textsearch/json"
 
-func (a *placeAPI) doGet(reqURL string, query url.Values) ([]byte, error) {
+func (api *placeAPI) doGet(reqURL string, query url.Values) ([]byte, error) {
 	if query == nil {
 		query = make(url.Values)
 	}
 
-	query.Set("key", a.key)
-	query.Set("language", a.lang)
+	query.Set("key", api.key)
+	query.Set("language", api.lang)
 
 	res, err := http.Get(reqURL + "?" + query.Encode())
 	if err != nil {
@@ -59,6 +61,14 @@ func (a *placeAPI) doGet(reqURL string, query url.Values) ([]byte, error) {
 	}
 
 	return bb, nil
+}
+
+func (api *placeAPI) getPhotoUrl(photoRef string, maxwidth int) string {
+	query := make(url.Values)
+	query.Set("key", api.key)
+	query.Set("photoreference", photoRef)
+	query.Set("maxwidth", strconv.Itoa(maxwidth))
+	return "https://maps.googleapis.com/maps/api/place/photo?" + query.Encode()
 }
 
 func main() {
@@ -101,5 +111,10 @@ func main() {
 
 	pretty.Println(qrDt)
 
-	// fmt.Fprintln(os.Stdout, string(bb))
+	urls := make([]string, len(qrDt.Result.Photos))
+	for i := range qrDt.Result.Photos {
+		urls[i] = api.getPhotoUrl(qrDt.Result.Photos[i].Ref, 3200)
+	}
+
+	fmt.Fprintln(os.Stdout, strings.Join(urls, "\n"))
 }
